@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+﻿﻿using System.Collections.Concurrent;
 using NetKick.Models;
 
 namespace NetKick.Services;
@@ -136,23 +136,30 @@ public class BlockingService : IDisposable
         try
         {
             Log($"Restoring ARP cache for {device.IpAddress}");
-        for (int i = 0; i < 5; i++)
+
             // Send multiple restore packets to ensure it takes effect
             for (int i = 0; i < 5; i++)
             {
                 // Tell target the real gateway MAC
                 _arpService.SendArpRestore(device, _gateway);
-            _arpService.SendArpRestore(_gateway, device);
+
                 // Tell gateway the real target MAC
                 _arpService.SendArpRestore(_gateway, device);
-        }
+
                 await Task.Delay(100);
             }
-    /// <summary>
+        }
         catch (Exception ex)
         {
             Log($"Error restoring device {device.IpAddress}: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Continuous loop that sends spoof packets to all blocked devices
+    /// </summary>
+    private async Task SpoofLoopAsync(CancellationToken token)
+    {
         while (!token.IsCancellationRequested)
         {
             foreach (var blocked in _blockedDevices.Values)

