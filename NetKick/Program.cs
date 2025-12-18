@@ -163,35 +163,35 @@ public class Program
                     .Title("\n[yellow]Main Menu:[/]")
                     .PageSize(10)
                     .AddChoices(
-                        "📋 View Devices",
-                        "🔒 Block Device",
-                        "🔓 Unblock Device",
-                        "📊 View Blocked Devices",
-                        "🔄 Rescan Network",
-                        "📜 View Logs",
-                        "❌ Exit"));
+                        "View Devices",
+                        "Block Device",
+                        "Unblock Device",
+                        "View Blocked Devices",
+                        "Rescan Network",
+                        "View Logs",
+                        "Exit"));
 
             switch (choice)
             {
-                case "📋 View Devices":
+                case "View Devices":
                     DisplayDevices();
                     break;
-                case "🔒 Block Device":
+                case "Block Device":
                     await BlockDeviceMenuAsync();
                     break;
-                case "🔓 Unblock Device":
+                case "Unblock Device":
                     await UnblockDeviceMenuAsync();
                     break;
-                case "📊 View Blocked Devices":
+                case "View Blocked Devices":
                     DisplayBlockedDevices();
                     break;
-                case "🔄 Rescan Network":
+                case "Rescan Network":
                     await ScanNetworkAsync();
                     break;
-                case "📜 View Logs":
+                case "View Logs":
                     DisplayLogs();
                     break;
-                case "❌ Exit":
+                case "Exit":
                     return;
             }
         }
@@ -226,13 +226,13 @@ public class Program
                 {
                     IpAddress = localIp,
                     MacAddress = _selectedInterface.MacAddress,
-                    Hostname = null,
+                    Hostname = Environment.MachineName,
                     IsGateway = false
                 });
             }
         }
 
-        // Order devices: Gateway first, Local second, then rest by IP
+        // Order devices: Gateway first, Host second, then rest by IP
         var ordered = devices
             .OrderByDescending(d => d.IsGateway)
             .ThenByDescending(d => _selectedInterface != null && d.IpAddress.Equals(_selectedInterface.IpAddress))
@@ -252,10 +252,10 @@ public class Program
         int index = 1;
         foreach (var device in ordered)
         {
-            // Determine role label: Gateway, Local, or Device. If both, show both.
+            // Determine role label: Gateway, Host, or Device. If both, show both.
             var roles = new List<string>();
             if (device.IsGateway) roles.Add("[cyan]Gateway[/]");
-            if (_selectedInterface != null && device.IpAddress.Equals(_selectedInterface.IpAddress)) roles.Add("[green]Local[/]");
+            if (_selectedInterface != null && device.IpAddress.Equals(_selectedInterface.IpAddress)) roles.Add("[green]Host[/]");
 
             var role = roles.Count > 0 ? string.Join(" / ", roles) : "Device";
 
