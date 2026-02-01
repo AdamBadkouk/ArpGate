@@ -27,9 +27,9 @@ public class NetworkInterfaceInfo
         {
             var ipBytes = IpAddress.GetAddressBytes();
             var maskBytes = SubnetMask.GetAddressBytes();
-            var networkBytes = new byte[4];
+            var networkBytes = new byte[ipBytes.Length];
 
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < ipBytes.Length; i++)
                 networkBytes[i] = (byte)(ipBytes[i] & maskBytes[i]);
 
             return new IPAddress(networkBytes);
@@ -45,9 +45,9 @@ public class NetworkInterfaceInfo
         {
             var ipBytes = IpAddress.GetAddressBytes();
             var maskBytes = SubnetMask.GetAddressBytes();
-            var broadcastBytes = new byte[4];
+            var broadcastBytes = new byte[ipBytes.Length];
 
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < ipBytes.Length; i++)
                 broadcastBytes[i] = (byte)(ipBytes[i] | ~maskBytes[i]);
 
             return new IPAddress(broadcastBytes);

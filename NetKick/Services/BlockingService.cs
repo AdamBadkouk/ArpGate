@@ -169,7 +169,7 @@ public class BlockingService : IDisposable
                 try
                 {
                     SendSpoofPackets(blocked.Device);
-                    blocked.PacketsSent += 2;
+                    blocked.IncrementPackets(2);
                 }
                 catch (Exception ex)
                 {
@@ -205,6 +205,8 @@ public class BlockedDeviceInfo
 {
     public required NetworkDevice Device { get; init; }
     public DateTime BlockedAt { get; init; }
-    public int PacketsSent { get; set; }
+    private int _packetsSent;
+    public int PacketsSent => _packetsSent;
+    public void IncrementPackets(int count) => Interlocked.Add(ref _packetsSent, count);
 }
 

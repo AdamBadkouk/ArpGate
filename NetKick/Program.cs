@@ -278,7 +278,7 @@ public class Program
         var ordered = devices
             .OrderByDescending(d => d.IsGateway)
             .ThenByDescending(d => _selectedInterface != null && d.IpAddress.Equals(_selectedInterface.IpAddress))
-            .ThenBy(d => d.IpAddress.GetAddressBytes()[3])
+            .ThenBy(d => d.IpAddress, new IpAddressComparer())
             .ToList();
 
         var table = new Table()
@@ -354,6 +354,12 @@ public class Program
         if (selected == "← Back") return;
 
         var index = choices.IndexOf(selected);
+        if (index < 0 || index >= devices.Count)
+        {
+            AnsiConsole.MarkupLine("[red]Invalid selection.[/]");
+            return;
+        }
+
         var device = devices[index];
 
         _blockingService.BlockDevice(device);

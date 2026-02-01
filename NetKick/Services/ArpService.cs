@@ -184,9 +184,8 @@ public class ArpService : IDisposable
                         DeviceDiscovered?.Invoke(this, device);
                         Log($"Discovered: {senderIp} -> {device.MacAddressString}");
                     }
-                    else
+                    else if (_devices.TryGetValue(senderIp, out var existing))
                     {
-                        var existing = _devices[senderIp];
                         existing.LastSeen = DateTime.Now;
 
                         // If MAC not set or placeholder, replace with a merged instance (init-only properties)
