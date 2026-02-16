@@ -3,6 +3,7 @@ using NetKick.Services;
 using SharpPcap.LibPcap;
 using Spectre.Console;
 using System.Net.NetworkInformation; // added for PhysicalAddress
+using System.Text.Json;
 
 namespace NetKick;
 
@@ -39,13 +40,22 @@ public class Program
 
             try
             {
-                // Download Npcap
+                // Resolve the latest Npcap version via GitHub API and download the installer
                 await AnsiConsole.Status()
                     .Spinner(Spinner.Known.Dots)
                     .StartAsync("[blue]Downloading Npcap...[/]", async ctx =>
                     {
                         using var httpClient = new System.Net.Http.HttpClient();
-                        var response = await httpClient.GetAsync("https://npcap.com/dist/npcap-1.80.exe");
+                        // GitHub API requires a User-Agent header
+                        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("NetKick/1.0");
+
+                        // Dynamically resolve the latest installer URL from GitHub releases
+                        var downloadUrl = await GetLatestNpcapUrlAsync(httpClient);
+
+                        ctx.Status($"[blue]Downloading Npcap from latest release...[/]");
+
+                        // Download the installer to a temp file
+                        var response = await httpClient.GetAsync(downloadUrl);
                         response.EnsureSuccessStatusCode();
                         
                         await using var fileStream = new FileStream(installerPath, FileMode.Create);
@@ -505,6 +515,28 @@ public class Program
         AnsiConsole.MarkupLine("[grey]═══════════════════════════════════════════════════════════[/]");
         AnsiConsole.MarkupLine("[red]⚠ WARNING: Only use on networks you own or have permission to test![/]");
         AnsiConsole.MarkupLine("[grey]═══════════════════════════════════════════════════════════[/]\n");
+    }
+
+    /// <summary>
+    /// Queries the GitHub Releases API for the latest Npcap version and constructs
+    /// the download URL from npcap.com. Throws on failure so the caller can handle it.
+    /// </summary>
+    private static async Task<string> GetLatestNpcapUrlAsync(System.Net.Http.HttpClient httpClient)
+    {
+        const string apiUrl = "https://api.github.com/repos/nmap/npcap/releases/latest";
+
+        // Fetch release metadata from GitHub
+        var json = await httpClient.GetStringAsync(apiUrl);
+        using var doc = JsonDocument.Parse(json);
+
+        // Extract version from tag_name (e.g. "v1.87" -> "1.87")
+        var tagName = doc.RootElement.GetProperty("tag_name").GetString()
+            ?? throw new Exception("Could not determine latest Npcap version.");
+
+        var version = tagName.TrimStart('v', 'V');
+
+        // Build the download URL using npcap.com's consistent naming pattern
+        return $"https://npcap.com/dist/npcap-{version}.exe";
     }
 
     private static bool IsAdministrator()

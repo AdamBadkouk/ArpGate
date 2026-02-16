@@ -115,3 +115,6 @@ ScaffoldingReadMe.txt
 # BenchmarkDotNet
 BenchmarkDotNet.Artifacts/
 
+# NetKick solution file
+NetKick.sln
+
