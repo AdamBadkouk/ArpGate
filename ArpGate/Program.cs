@@ -1,11 +1,11 @@
-﻿using NetKick.Models;
-using NetKick.Services;
+﻿using ArpGate.Models;
+using ArpGate.Services;
 using SharpPcap.LibPcap;
 using Spectre.Console;
 using System.Net.NetworkInformation; // added for PhysicalAddress
 using System.Text.Json;
 
-namespace NetKick;
+namespace ArpGate;
 
 public class Program
 {
@@ -18,7 +18,7 @@ public class Program
 
     public static async Task Main(string[] args)
     {
-        Console.Title = "NetKick - ARP Spoofer";
+        Console.Title = "ArpGate - ARP Spoofer";
 
         PrintBanner();
 
@@ -47,7 +47,7 @@ public class Program
                     {
                         using var httpClient = new System.Net.Http.HttpClient();
                         // GitHub API requires a User-Agent header
-                        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("NetKick/1.0");
+                        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("ArpGate/1.0");
 
                         // Dynamically resolve the latest installer URL from GitHub releases
                         var downloadUrl = await GetLatestNpcapUrlAsync(httpClient);
@@ -82,7 +82,7 @@ public class Program
                 if (File.Exists(installerPath))
                     File.Delete(installerPath);
 
-                AnsiConsole.MarkupLine("[yellow]⚠ Please restart NetKick to continue.[/]");
+                AnsiConsole.MarkupLine("[yellow]⚠ Please restart ArpGate to continue.[/]");
             }
             catch (Exception ex)
             {
@@ -507,7 +507,7 @@ public class Program
     private static void PrintBanner()
     {
         AnsiConsole.Write(
-            new FigletText("NetKick")
+            new FigletText("ArpGate")
                 .LeftJustified()
                 .Color(Color.Cyan1));
 

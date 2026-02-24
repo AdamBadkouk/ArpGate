@@ -1,12 +1,12 @@
 ﻿using System.Net;
 using System.Net.NetworkInformation;
 using System.Collections.Concurrent;
-using NetKick.Models;
+using ArpGate.Models;
 using PacketDotNet;
 using SharpPcap;
 using SharpPcap.LibPcap;
 
-namespace NetKick.Services;
+namespace ArpGate.Services;
 
 /// <summary>
 /// Handles ARP packet operations including scanning and spoofing

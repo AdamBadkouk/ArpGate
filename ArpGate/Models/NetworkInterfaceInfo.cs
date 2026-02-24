@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using System.Net.NetworkInformation;
 
-namespace NetKick.Models;
+namespace ArpGate.Models;
 
 /// <summary>
 /// Represents a network interface with its configuration

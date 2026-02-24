@@ -1,11 +1,11 @@
 ﻿using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using NetKick.Models;
+using ArpGate.Models;
 using SharpPcap;
 using SharpPcap.LibPcap;
 
-namespace NetKick.Services;
+namespace ArpGate.Services;
 
 /// <summary>
 /// Handles network interface discovery and selection

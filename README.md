@@ -1,6 +1,6 @@
-﻿# NetKick - ARP Spoofer & Network Blocker
+﻿# ArpGate - ARP Spoofer & Network Blocker
 
-A powerful network tool built with C# and .NET 10 that allows you to scan your local network, discover devices, and block/unblock internet access for specific devices using ARP spoofing.
+A powerful network tool built with .NET 10 that allows you to scan your local network, discover devices, and block/unblock internet access for specific devices using ARP spoofing.
 
 ![Warning](https://img.shields.io/badge/⚠️-Educational%20Purpose%20Only-red)
 
@@ -16,7 +16,6 @@ A powerful network tool built with C# and .NET 10 that allows you to scan your l
 - **Unblock Devices**: Restore internet access by sending correct ARP packets
 - **Status Monitoring**: View currently blocked devices and spoofing statistics
 - **Logging**: Track all operations with timestamped logs
-- **Beautiful CLI**: Interactive console UI with Spectre.Console
 
 ## Requirements
 
@@ -27,21 +26,17 @@ A powerful network tool built with C# and .NET 10 that allows you to scan your l
 
 ## Installation
 
-1. Install [Npcap](https://npcap.com/dist/npcap-1.79.exe)
-   - During installation, check "Install Npcap in WinPcap API-compatible Mode"
+1. Clone or download this repository.
 
-2. Clone or download this repository
+2. Open terminal as Administrator:
 
-3. Build the project:
+- Navigate to the project folder and run:
    ```bash
-   cd NetKick
-   dotnet build -c Release
-   ```
-
-4. Run as Administrator:
-   ```bash
+   cd ArpGate
    dotnet run
    ```
+
+3. If Npcap is not installed the application will launch the installer automatically, follow the installer and choose "Install Npcap in WinPcap API-compatible Mode".
 
 ## Usage
 
@@ -68,8 +63,8 @@ ARP (Address Resolution Protocol) is used to map IP addresses to MAC addresses o
 ### Architecture
 
 ```
-NetKick/
-├── NetKick/
+ArpGate/
+├── ArpGate/
 │   ├── Models/
 │   │   ├── NetworkDevice.cs       # Represents a discovered device
 │   │   └── NetworkInterfaceInfo.cs # Network interface configuration
@@ -79,7 +74,7 @@ NetKick/
 │   │   └── NetworkService.cs      # Interface discovery
 │   ├── Program.cs                 # Main entry point and UI
 │   ├── app.manifest               # Admin privileges manifest
-│   └── NetKick.csproj             # Project file
+│   └── ArpGate.csproj             # Project file
 ├── .gitignore
 ├── LICENSE
 └── README.md
@@ -92,19 +87,6 @@ NetKick/
 | [SharpPcap](https://github.com/dotpcap/sharppcap) | 6.3.1 | Packet capture library |
 | [PacketDotNet](https://github.com/dotpcap/packetnet) | 1.4.8 | Packet construction/parsing |
 | [Spectre.Console](https://spectreconsole.net/) | 0.54.0 | Beautiful console UI |
-
-## Building
-
-```bash
-# Debug build
-dotnet build
-
-# Release build
-dotnet build -c Release
-
-# Publish self-contained
-dotnet publish -c Release -r win-x64 --self-contained
-```
 
 ## Troubleshooting
 

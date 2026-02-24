@@ -1,7 +1,7 @@
 ﻿﻿using System.Collections.Concurrent;
-using NetKick.Models;
+using ArpGate.Models;
 
-namespace NetKick.Services;
+namespace ArpGate.Services;
 
 /// <summary>
 /// Manages blocking and unblocking of network devices using ARP spoofing
