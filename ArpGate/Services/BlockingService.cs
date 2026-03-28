@@ -1,4 +1,5 @@
 ﻿﻿using System.Collections.Concurrent;
+using System.Net.NetworkInformation;
 using ArpGate.Models;
 
 namespace ArpGate.Services;
@@ -6,10 +7,11 @@ namespace ArpGate.Services;
 /// <summary>
 /// Manages blocking and unblocking of network devices using ARP spoofing
 /// </summary>
-public class BlockingService : IDisposable
+public class BlockingService : IAsyncDisposable, IDisposable
 {
     private readonly ArpService _arpService;
     private readonly NetworkDevice _gateway;
+    private readonly NetworkInterfaceInfo _interfaceInfo;
     private readonly ConcurrentDictionary<string, BlockedDeviceInfo> _blockedDevices = new();
     private CancellationTokenSource? _spoofCts;
     private Task? _spoofTask;
@@ -20,10 +22,11 @@ public class BlockingService : IDisposable
 
     public event EventHandler<string>? LogMessage;
 
-    public BlockingService(ArpService arpService, NetworkDevice gateway)
+    public BlockingService(ArpService arpService, NetworkDevice gateway, NetworkInterfaceInfo interfaceInfo)
     {
         _arpService = arpService;
         _gateway = gateway;
+        _interfaceInfo = interfaceInfo;
     }
 
     /// <summary>
@@ -74,6 +77,20 @@ public class BlockingService : IDisposable
         if (device.IsGateway)
         {
             Log("Cannot block the gateway!");
+            return;
+        }
+
+        // Prevent self-blocking
+        if (_interfaceInfo != null && device.IpAddress.Equals(_interfaceInfo.IpAddress))
+        {
+            Log("Cannot block yourself!");
+            return;
+        }
+
+        // Validate MAC address before blocking
+        if (device.MacAddress == null || device.MacAddress.Equals(PhysicalAddress.None))
+        {
+            Log($"Cannot block {device.IpAddress}: MAC address not known");
             return;
         }
 
@@ -162,7 +179,10 @@ public class BlockingService : IDisposable
     {
         while (!token.IsCancellationRequested)
         {
-            foreach (var blocked in _blockedDevices.Values)
+            // Take snapshot to avoid collection modification during iteration
+            var snapshot = _blockedDevices.Values.ToArray();
+            
+            foreach (var blocked in snapshot)
             {
                 if (token.IsCancellationRequested) break;
 
@@ -191,12 +211,29 @@ public class BlockingService : IDisposable
 
     private void Log(string message) => LogMessage?.Invoke(this, message);
 
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        await StopAsync();
+        _spoofCts?.Dispose();
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
 
-        _spoofCts?.Cancel();
+        // Synchronously stop and restore - best effort for non-async disposal
+        try
+        {
+            StopAsync().GetAwaiter().GetResult();
+        }
+        catch
+        {
+            // Best effort cleanup
+        }
         _spoofCts?.Dispose();
     }
 }

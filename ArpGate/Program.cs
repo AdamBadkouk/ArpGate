@@ -15,10 +15,28 @@ public class Program
     private static NetworkDevice? _gateway;
     private static readonly List<string> _logMessages = new();
     private static readonly object _logLock = new();
+    private static readonly CancellationTokenSource _shutdownCts = new();
+    private static bool _isShuttingDown = false;
+
+    // Maximum subnet size to scan (default /20 = 4094 hosts)
+    private const int MaxSubnetPrefixLength = 20;
 
     public static async Task Main(string[] args)
     {
         Console.Title = "ArpGate - ARP Spoofer";
+
+        // Setup Ctrl+C handler for graceful shutdown
+        Console.CancelKeyPress += async (sender, e) =>
+        {
+            e.Cancel = true; // Prevent immediate termination
+            if (!_isShuttingDown)
+            {
+                _isShuttingDown = true;
+                AnsiConsole.MarkupLine("\n[yellow]Interrupt received. Restoring ARP caches...[/]");
+                await CleanupAsync();
+                _shutdownCts.Cancel();
+            }
+        };
 
         PrintBanner();
 
@@ -160,7 +178,7 @@ public class Program
         }
 
         // Initialize blocking service
-        _blockingService = new BlockingService(_arpService, _gateway);
+        _blockingService = new BlockingService(_arpService, _gateway, _selectedInterface);
         _blockingService.LogMessage += (_, msg) => AddLog(msg);
         _blockingService.Start();
 
@@ -193,7 +211,21 @@ public class Program
 
     private static async Task ScanNetworkAsync()
     {
-        if (_arpService == null) return;
+        if (_arpService == null || _selectedInterface == null) return;
+
+        // Check subnet size limit
+        if (_selectedInterface.PrefixLength < MaxSubnetPrefixLength)
+        {
+            var hostCount = Math.Pow(2, 32 - _selectedInterface.PrefixLength) - 2;
+            AnsiConsole.MarkupLine($"[yellow]⚠ Large subnet detected (/{_selectedInterface.PrefixLength} = ~{hostCount:N0} hosts)[/]");
+            
+            var proceed = AnsiConsole.Confirm($"Scanning may take a while and flood the network. Continue?", false);
+            if (!proceed)
+            {
+                AnsiConsole.MarkupLine("[grey]Scan cancelled.[/]");
+                return;
+            }
+        }
 
         await AnsiConsole.Status()
             .Spinner(Spinner.Known.Dots)
@@ -491,15 +523,27 @@ public class Program
 
     private static async Task CleanupAsync()
     {
+        if (_isShuttingDown && _blockingService == null && _arpService == null)
+            return; // Already cleaned up
+
         AnsiConsole.MarkupLine("\n[yellow]Cleaning up...[/]");
 
         if (_blockingService != null)
         {
-            await _blockingService.StopAsync();
-            _blockingService.Dispose();
+            try
+            {
+                await _blockingService.StopAsync();
+                await _blockingService.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                AnsiConsole.MarkupLine($"[red]Error during cleanup: {ex.Message}[/]");
+            }
+            _blockingService = null;
         }
 
         _arpService?.Dispose();
+        _arpService = null;
 
         AnsiConsole.MarkupLine("[green]Cleanup complete. Goodbye![/]");
     }

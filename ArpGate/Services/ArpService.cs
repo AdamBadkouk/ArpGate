@@ -228,6 +228,9 @@ public class ArpService : IDisposable
     {
         try
         {
+            // Ensure device is open before sending
+            Open();
+
             var ethernetPacket = new EthernetPacket(
                 _interfaceInfo.MacAddress,
                 PhysicalAddress.Parse("FF-FF-FF-FF-FF-FF"),
@@ -257,6 +260,9 @@ public class ArpService : IDisposable
     {
         try
         {
+            // Ensure device is open before sending
+            Open();
+
             // Tell target that we (our MAC) are at impersonate's IP
             var ethernetPacket = new EthernetPacket(
                 _interfaceInfo.MacAddress,
@@ -286,6 +292,9 @@ public class ArpService : IDisposable
     {
         try
         {
+            // Ensure device is open before sending
+            Open();
+
             // We send the packet from our MAC (required), but the ARP payload contains the real device's info
             var ethernetPacket = new EthernetPacket(
                 _interfaceInfo.MacAddress,  // Source must be our MAC to send
