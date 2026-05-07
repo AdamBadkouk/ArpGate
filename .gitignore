@@ -16,6 +16,7 @@ bld/
 
 # Visual Studio files
 .vs/
+*.sln
 *.user
 *.userosscache
 *.sln.docstates
@@ -114,7 +115,4 @@ ScaffoldingReadMe.txt
 
 # BenchmarkDotNet
 BenchmarkDotNet.Artifacts/
-
-# ArpGate solution file
-ArpGate.sln
 
