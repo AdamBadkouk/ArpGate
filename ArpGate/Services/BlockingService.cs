@@ -46,16 +46,11 @@ public class BlockingService : IAsyncDisposable, IDisposable
     /// </summary>
     public async Task StopAsync()
     {
-        if (!IsRunning) return;
+        if (_spoofTask == null && _blockedDevices.IsEmpty) return;
 
         Log("Stopping blocking service...");
 
-        // Restore all blocked devices first
-        foreach (var blocked in _blockedDevices.Values)
-        {
-            await RestoreDeviceAsync(blocked.Device);
-        }
-
+        // Stop spoofing first so restore packets are not overwritten by new poison packets.
         _spoofCts?.Cancel();
 
         try
@@ -64,6 +59,18 @@ public class BlockingService : IAsyncDisposable, IDisposable
                 await _spoofTask;
         }
         catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Log($"Spoof loop exited with error: {ex.Message}");
+        }
+
+        _spoofTask = null;
+
+        // Restore all blocked devices after spoof loop has fully stopped.
+        foreach (var blocked in _blockedDevices.Values.ToList())
+        {
+            await RestoreDeviceAsync(blocked.Device);
+        }
 
         _blockedDevices.Clear();
         Log("Blocking service stopped");
@@ -246,4 +253,3 @@ public class BlockedDeviceInfo
     public int PacketsSent => _packetsSent;
     public void IncrementPackets(int count) => Interlocked.Add(ref _packetsSent, count);
 }
-
