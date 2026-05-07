@@ -2,6 +2,8 @@
 using ArpGate.Services;
 using SharpPcap.LibPcap;
 using Spectre.Console;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Net.NetworkInformation; // added for PhysicalAddress
 using System.Text.Json;
 
@@ -20,6 +22,8 @@ public class Program
 
     // Maximum subnet size to scan (default /20 = 4094 hosts)
     private const int MaxSubnetPrefixLength = 20;
+    private const string NpcapReleasesApiUrl = "https://api.github.com/repos/nmap/npcap/releases/latest";
+    private static readonly string[] TrustedNpcapPublisherMarkers = ["INSECURE.COM", "NMAP SOFTWARE", "NMAP PROJECT"];
 
     public static async Task Main(string[] args)
     {
@@ -69,15 +73,22 @@ public class Program
 
                         // Dynamically resolve the latest installer URL from GitHub releases
                         var downloadUrl = await GetLatestNpcapUrlAsync(httpClient);
+                        EnsureTrustedNpcapDownloadUri(new Uri(downloadUrl));
 
                         ctx.Status($"[blue]Downloading Npcap from latest release...[/]");
 
                         // Download the installer to a temp file
-                        var response = await httpClient.GetAsync(downloadUrl);
+                        using var response = await httpClient.GetAsync(downloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
                         response.EnsureSuccessStatusCode();
+                        EnsureTrustedNpcapDownloadUri(response.RequestMessage?.RequestUri);
                         
-                        await using var fileStream = new FileStream(installerPath, FileMode.Create);
-                        await response.Content.CopyToAsync(fileStream);
+                        await using (var fileStream = new FileStream(installerPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                        {
+                            await response.Content.CopyToAsync(fileStream);
+                        }
+
+                        ctx.Status("[blue]Verifying installer signature...[/]");
+                        VerifyDownloadedNpcapInstaller(installerPath);
                     });
 
                 AnsiConsole.MarkupLine("[green]✓ Download complete[/]");
@@ -104,7 +115,7 @@ public class Program
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine("[red]✗ Download failed.[/]");
+                AnsiConsole.MarkupLine("[red]✗ Download or verification failed.[/]");
                 AnsiConsole.MarkupLine($"[grey]{ex.Message}[/]");
                 AnsiConsole.MarkupLine("[yellow]Please install manually from:[/] https://npcap.com");
                 
@@ -567,10 +578,8 @@ public class Program
     /// </summary>
     private static async Task<string> GetLatestNpcapUrlAsync(System.Net.Http.HttpClient httpClient)
     {
-        const string apiUrl = "https://api.github.com/repos/nmap/npcap/releases/latest";
-
         // Fetch release metadata from GitHub
-        var json = await httpClient.GetStringAsync(apiUrl);
+        var json = await httpClient.GetStringAsync(NpcapReleasesApiUrl);
         using var doc = JsonDocument.Parse(json);
 
         // Extract version from tag_name (e.g. "v1.87" -> "1.87")
@@ -578,9 +587,79 @@ public class Program
             ?? throw new Exception("Could not determine latest Npcap version.");
 
         var version = tagName.TrimStart('v', 'V');
+        if (string.IsNullOrWhiteSpace(version) || version.Any(ch => !char.IsDigit(ch) && ch != '.'))
+            throw new Exception($"Unexpected Npcap release tag format: {tagName}");
 
         // Build the download URL using npcap.com's consistent naming pattern
         return $"https://npcap.com/dist/npcap-{version}.exe";
+    }
+
+    private static void EnsureTrustedNpcapDownloadUri(Uri? uri)
+    {
+        if (uri == null)
+            throw new Exception("Download URL was not resolved.");
+
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            throw new Exception($"Refusing non-HTTPS download URL: {uri}");
+
+        if (!string.Equals(uri.Host, "npcap.com", StringComparison.OrdinalIgnoreCase))
+            throw new Exception($"Refusing untrusted download host: {uri.Host}");
+
+        var path = uri.AbsolutePath;
+        if (!path.StartsWith("/dist/npcap-", StringComparison.OrdinalIgnoreCase) ||
+            !path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new Exception($"Refusing unexpected installer path: {path}");
+        }
+    }
+
+    private static void VerifyDownloadedNpcapInstaller(string installerPath)
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("Installer signature verification is only supported on Windows.");
+
+        X509Certificate2 certificate;
+        try
+        {
+            // Required for extracting Authenticode signer from an executable.
+#pragma warning disable SYSLIB0057
+            certificate = new X509Certificate2(X509Certificate.CreateFromSignedFile(installerPath));
+#pragma warning restore SYSLIB0057
+        }
+        catch (CryptographicException ex)
+        {
+            throw new Exception("Downloaded installer is not Authenticode-signed.", ex);
+        }
+
+        using (certificate)
+        {
+            using (var chain = new X509Chain())
+            {
+                chain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
+                chain.ChainPolicy.RevocationFlag = X509RevocationFlag.EntireChain;
+                chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+                chain.ChainPolicy.ApplicationPolicy.Add(new Oid("1.3.6.1.5.5.7.3.3")); // Code Signing EKU
+
+                if (!chain.Build(certificate))
+                {
+                    var errors = chain.ChainStatus
+                        .Select(status => status.StatusInformation.Trim())
+                        .Where(msg => !string.IsNullOrWhiteSpace(msg));
+                    var chainErrorText = string.Join("; ", errors);
+                    throw new Exception(string.IsNullOrWhiteSpace(chainErrorText)
+                        ? "Installer certificate chain validation failed."
+                        : $"Installer certificate chain validation failed: {chainErrorText}");
+                }
+            }
+
+            var subject = certificate.Subject.ToUpperInvariant();
+            var issuer = certificate.Issuer.ToUpperInvariant();
+            var isTrustedPublisher = TrustedNpcapPublisherMarkers.Any(marker =>
+                subject.Contains(marker, StringComparison.Ordinal) || issuer.Contains(marker, StringComparison.Ordinal));
+
+            if (!isTrustedPublisher)
+                throw new Exception($"Unexpected installer publisher: {certificate.Subject}");
+        }
     }
 
     private static bool IsAdministrator()
