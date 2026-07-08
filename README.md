@@ -17,30 +17,85 @@ A powerful network tool built with .NET 10 that allows you to scan your local ne
 - **Status Monitoring**: View currently blocked devices and spoofing statistics
 - **Logging**: Track all operations with timestamped logs
 
+## Platform Support
+
+| Platform | Packet Capture | Status |
+|----------|---------------|--------|
+| Windows 10/11 | [Npcap](https://npcap.com) (WinPcap API-compatible mode) | ✅ Fully supported |
+| Linux (Debian/Ubuntu/Fedora/Arch/openSUSE) | libpcap | ✅ Fully supported |
+
 ## Requirements
 
+### Windows
 - Windows 10/11
 - .NET 10 SDK
 - [Npcap](https://npcap.com) (install with WinPcap compatibility mode)
 - Administrator privileges
 
+### Linux
+- .NET 10 SDK
+- libpcap (`libpcap-dev` on Debian/Ubuntu, `libpcap` on Fedora/Arch/openSUSE)
+- Root privileges
+
 ## Installation
 
-1. Clone or download this repository.
+### Windows
 
-2. Open terminal as Administrator:
+```bash
+# Clone the repository
+git clone https://github.com/AdamBadkouk/ArpGate.git
+cd ArpGate/ArpGate
 
-- Navigate to the project folder and run:
-   ```bash
-   cd ArpGate
-   dotnet run
-   ```
+# Run as Administrator (Npcap will install automatically if missing)
+dotnet run
+```
 
-3. If Npcap is not installed the application will launch the installer automatically, follow the installer and choose "Install Npcap in WinPcap API-compatible Mode".
+- If Npcap is not installed, the app will download and launch the installer
+- Choose "Install Npcap in WinPcap API-compatible Mode" in the installer wizard
+
+### Linux (Debian/Ubuntu)
+
+```bash
+# Install dependencies
+sudo apt update && sudo apt install -y libpcap-dev
+
+# Clone and run
+git clone https://github.com/AdamBadkouk/ArpGate.git
+cd ArpGate/ArpGate
+sudo dotnet run
+```
+
+### Linux (Fedora)
+
+```bash
+sudo dnf install -y libpcap
+git clone https://github.com/AdamBadkouk/ArpGate.git
+cd ArpGate/ArpGate
+sudo dotnet run
+```
+
+### Linux (Arch Linux)
+
+```bash
+sudo pacman -S libpcap
+git clone https://github.com/AdamBadkouk/ArpGate.git
+cd ArpGate/ArpGate
+sudo dotnet run
+```
+
+### Linux (openSUSE)
+
+```bash
+sudo zypper install libpcap
+git clone https://github.com/AdamBadkouk/ArpGate.git
+cd ArpGate/ArpGate
+sudo dotnet run
+```
+
 
 ## Usage
 
-1. **Launch the application** as Administrator
+1. **Launch the application** as Administrator (Windows) or with sudo (Linux)
 2. **Select your network interface** from the list
 3. **Wait for the network scan** to complete
 4. Use the menu to:
@@ -73,7 +128,7 @@ ArpGate/
 │   │   ├── BlockingService.cs     # Device blocking/unblocking logic
 │   │   └── NetworkService.cs      # Interface discovery
 │   ├── Program.cs                 # Main entry point and UI
-│   ├── app.manifest               # Admin privileges manifest
+│   ├── app.manifest               # Admin privileges manifest (Windows only)
 │   └── ArpGate.csproj             # Project file
 ├── .gitignore
 ├── LICENSE
@@ -90,9 +145,14 @@ ArpGate/
 
 ## Troubleshooting
 
-### "Npcap is not installed"
+### "Npcap is not installed" (Windows)
 - Download and install Npcap from https://npcap.com
 - Make sure to check "Install Npcap in WinPcap API-compatible Mode"
+
+### "libpcap is not installed or not accessible" (Linux)
+- Install libpcap for your distribution (see Installation section)
+- Ensure you're running with `sudo`
+- Verify libpcap is found: `ldconfig -p | grep libpcap`
 
 ### "No suitable network interfaces found"
 - Make sure you have an active network connection
@@ -107,6 +167,9 @@ ArpGate/
 - The target device might be using a VPN
 - Try increasing the spoofing frequency
 
+### Permission denied / Operation not permitted (Linux)
+- Run with `sudo dotnet run`
+
 ## License
 
 MIT License - Use at your own risk.
@@ -114,4 +177,3 @@ MIT License - Use at your own risk.
 ## Contributing
 
 Contributions are welcome! Please ensure any network tools are used responsibly and ethically.
-
