@@ -13,7 +13,7 @@ namespace ArpGate.Services;
 public static class NetworkService
 {
     /// <summary>
-    /// Gets all available network interfaces with Npcap
+    /// Gets all available network interfaces with libpcap/Npcap
     /// </summary>
     public static List<(LibPcapLiveDevice Device, NetworkInterfaceInfo Info)> GetAvailableInterfaces()
     {
@@ -91,9 +91,9 @@ public static class NetworkService
     }
 
     /// <summary>
-    /// Checks if Npcap is installed and available
+    /// Checks if packet capture is available (Npcap on Windows, libpcap on Linux)
     /// </summary>
-    public static bool IsNpcapInstalled()
+    public static bool IsPacketCaptureAvailable()
     {
         try
         {

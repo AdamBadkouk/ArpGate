@@ -22,8 +22,6 @@ public class Program
 
     // Maximum subnet size to scan (default /20 = 4094 hosts)
     private const int MaxSubnetPrefixLength = 20;
-    private const string NpcapReleasesApiUrl = "https://api.github.com/repos/nmap/npcap/releases/latest";
-    private static readonly string[] TrustedNpcapPublisherMarkers = ["INSECURE.COM", "NMAP SOFTWARE", "NMAP PROJECT"];
 
     public static async Task Main(string[] args)
     {
@@ -44,86 +42,35 @@ public class Program
 
         PrintBanner();
 
-        // Check for admin privileges
+        // Check for admin/root privileges
         if (!IsAdministrator())
         {
-            AnsiConsole.MarkupLine("[red]⚠ This application requires Administrator privileges![/]");
-            AnsiConsole.MarkupLine("[yellow]Please restart as Administrator.[/]");
+            AnsiConsole.MarkupLine("[red]⚠ This application requires Administrator/root privileges![/]");
+            AnsiConsole.MarkupLine("[yellow]Please restart as Administrator (Windows) or with sudo (Linux).[/]");
             Console.ReadKey();
             return;
         }
 
-        // Check for Npcap
-        if (!NetworkService.IsNpcapInstalled())
+        // OS-specific packet capture setup
+        if (OperatingSystem.IsWindows())
         {
-            AnsiConsole.MarkupLine("[red]⚠ Npcap is not installed![/]");
-
-            var installerPath = Path.Combine(Path.GetTempPath(), "npcap-installer.exe");
-
-            try
+            if (!await EnsureNpcapInstalled())
             {
-                // Resolve the latest Npcap version via GitHub API and download the installer
-                await AnsiConsole.Status()
-                    .Spinner(Spinner.Known.Dots)
-                    .StartAsync("[blue]Downloading Npcap...[/]", async ctx =>
-                    {
-                        using var httpClient = new System.Net.Http.HttpClient();
-                        // GitHub API requires a User-Agent header
-                        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("ArpGate/1.0");
-
-                        // Dynamically resolve the latest installer URL from GitHub releases
-                        var downloadUrl = await GetLatestNpcapUrlAsync(httpClient);
-                        EnsureTrustedNpcapDownloadUri(new Uri(downloadUrl));
-
-                        ctx.Status($"[blue]Downloading Npcap from latest release...[/]");
-
-                        // Download the installer to a temp file
-                        using var response = await httpClient.GetAsync(downloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
-                        response.EnsureSuccessStatusCode();
-                        EnsureTrustedNpcapDownloadUri(response.RequestMessage?.RequestUri);
-                        
-                        await using (var fileStream = new FileStream(installerPath, FileMode.Create, FileAccess.Write, FileShare.None))
-                        {
-                            await response.Content.CopyToAsync(fileStream);
-                        }
-
-                        ctx.Status("[blue]Verifying installer signature...[/]");
-                        VerifyDownloadedNpcapInstaller(installerPath);
-                    });
-
-                AnsiConsole.MarkupLine("[green]✓ Download complete[/]");
-                AnsiConsole.MarkupLine("[yellow]Launching installer... Please complete the installation wizard.[/]");
-
-                // Launch installer (GUI mode - user completes wizard)
-                var processInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = installerPath,
-                    UseShellExecute = true
-                };
-
-                using var process = System.Diagnostics.Process.Start(processInfo);
-                if (process != null)
-                {
-                    await process.WaitForExitAsync();
-                }
-
-                // Cleanup installer
-                if (File.Exists(installerPath))
-                    File.Delete(installerPath);
-
-                AnsiConsole.MarkupLine("[yellow]⚠ Please restart ArpGate to continue.[/]");
+                Console.ReadKey();
+                return;
             }
-            catch (Exception ex)
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            if (!EnsureLibpcapInstalled())
             {
-                AnsiConsole.MarkupLine("[red]✗ Download or verification failed.[/]");
-                AnsiConsole.MarkupLine($"[grey]{ex.Message}[/]");
-                AnsiConsole.MarkupLine("[yellow]Please install manually from:[/] https://npcap.com");
-                
-                // Cleanup on failure
-                if (File.Exists(installerPath))
-                    File.Delete(installerPath);
+                Console.ReadKey();
+                return;
             }
-
+        }
+        else
+        {
+            AnsiConsole.MarkupLine("[yellow]⚠ Unsupported OS. This tool is tested on Windows and Linux only.[/]");
             Console.ReadKey();
             return;
         }
@@ -141,6 +88,117 @@ public class Program
         {
             await CleanupAsync();
         }
+    }
+
+    // Windows-only Npcap constants and methods
+    private const string NpcapReleasesApiUrl = "https://api.github.com/repos/nmap/npcap/releases/latest";
+    private static readonly string[] TrustedNpcapPublisherMarkers = ["INSECURE.COM", "NMAP SOFTWARE", "NMAP PROJECT"];
+
+    /// <summary>
+    /// Ensures Npcap is installed on Windows. Returns true if ready to proceed.
+    /// </summary>
+    private static async Task<bool> EnsureNpcapInstalled()
+    {
+        if (NetworkService.IsPacketCaptureAvailable())
+            return true;
+
+        AnsiConsole.MarkupLine("[red]⚠ Npcap is not installed![/]");
+
+        var installerPath = Path.Combine(Path.GetTempPath(), "npcap-installer.exe");
+
+        try
+        {
+            // Resolve the latest Npcap version via GitHub API and download the installer
+            await AnsiConsole.Status()
+                .Spinner(Spinner.Known.Dots)
+                .StartAsync("[blue]Downloading Npcap...[/]", async ctx =>
+                {
+                    using var httpClient = new System.Net.Http.HttpClient();
+                    // GitHub API requires a User-Agent header
+                    httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("ArpGate/1.0");
+
+                    // Dynamically resolve the latest installer URL from GitHub releases
+                    var downloadUrl = await GetLatestNpcapUrlAsync(httpClient);
+                    EnsureTrustedNpcapDownloadUri(new Uri(downloadUrl));
+
+                    ctx.Status($"[blue]Downloading Npcap from latest release...[/]");
+
+                    // Download the installer to a temp file
+                    using var response = await httpClient.GetAsync(downloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
+                    response.EnsureSuccessStatusCode();
+                    EnsureTrustedNpcapDownloadUri(response.RequestMessage?.RequestUri);
+
+                    await using (var fileStream = new FileStream(installerPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        await response.Content.CopyToAsync(fileStream);
+                    }
+
+                    ctx.Status("[blue]Verifying installer signature...[/]");
+                    VerifyDownloadedNpcapInstaller(installerPath);
+                });
+
+            AnsiConsole.MarkupLine("[green]✓ Download complete[/]");
+            AnsiConsole.MarkupLine("[yellow]Launching installer... Please complete the installation wizard.[/]");
+
+            // Launch installer (GUI mode - user completes wizard)
+            var processInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = installerPath,
+                UseShellExecute = true
+            };
+
+            using var process = System.Diagnostics.Process.Start(processInfo);
+            if (process != null)
+            {
+                await process.WaitForExitAsync();
+            }
+
+            // Cleanup installer
+            if (File.Exists(installerPath))
+                File.Delete(installerPath);
+
+            // Verify installation succeeded
+            if (NetworkService.IsPacketCaptureAvailable())
+            {
+                AnsiConsole.MarkupLine("[green]✓ Npcap installed successfully[/]");
+                return true;
+            }
+
+            AnsiConsole.MarkupLine("[yellow]⚠ Please restart ArpGate to continue.[/]");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine("[red]✗ Download or verification failed.[/]");
+            AnsiConsole.MarkupLine($"[grey]{ex.Message}[/]");
+            AnsiConsole.MarkupLine("[yellow]Please install manually from:[/] https://npcap.com");
+
+            // Cleanup on failure
+            if (File.Exists(installerPath))
+                File.Delete(installerPath);
+
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Ensures libpcap is available on Linux. Returns true if ready to proceed.
+    /// </summary>
+    private static bool EnsureLibpcapInstalled()
+    {
+        if (NetworkService.IsPacketCaptureAvailable())
+            return true;
+
+        AnsiConsole.MarkupLine("[red]⚠ libpcap is not installed or not accessible![/]");
+        AnsiConsole.MarkupLine("[yellow]Install libpcap for your distribution:[/]");
+        AnsiConsole.MarkupLine("  [cyan]Debian/Ubuntu:[/] sudo apt update && sudo apt install libpcap-dev");
+        AnsiConsole.MarkupLine("  [cyan]Fedora:[/] sudo dnf install libpcap");
+        AnsiConsole.MarkupLine("  [cyan]Arch Linux:[/] sudo pacman -S libpcap");
+        AnsiConsole.MarkupLine("  [cyan]openSUSE:[/] sudo zypper install libpcap");
+        AnsiConsole.MarkupLine("[grey] [/]");
+        AnsiConsole.MarkupLine("[yellow]Then run with:[/] [cyan]sudo dotnet run[/]");
+
+        return false;
     }
 
 
@@ -670,6 +728,30 @@ public class Program
             var principal = new System.Security.Principal.WindowsPrincipal(identity);
             return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
         }
+
+        // Linux/macOS: check if running as root (effective UID 0)
+        // Works for both direct root and sudo
+        try
+        {
+            var output = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "id",
+                Arguments = "-u",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            })?.StandardOutput.ReadToEnd().Trim();
+
+            if (int.TryParse(output, out var uid))
+                return uid == 0;
+        }
+        catch
+        {
+            // Fallback: check environment variable set by sudo
+            if (Environment.GetEnvironmentVariable("SUDO_USER") != null)
+                return true;
+        }
+
         return Environment.UserName == "root";
     }
 }
